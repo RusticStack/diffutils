@@ -116,6 +116,15 @@ fn make_diff(expected: &[u8], actual: &[u8], stop_early: bool) -> Vec<Mismatch> 
     results
 }
 
+/// `first` alone for one line, else `first,last` (GNU normal and ed formats).
+fn line_range(first: usize, count: usize) -> String {
+    if count == 1 {
+        first.to_string()
+    } else {
+        format!("{first},{}", first + count - 1)
+    }
+}
+
 #[must_use]
 pub fn diff(expected: &[u8], actual: &[u8], params: &Params) -> Vec<u8> {
     // See https://www.gnu.org/software/diffutils/manual/html_node/Detailed-Normal.html
@@ -131,61 +140,28 @@ pub fn diff(expected: &[u8], actual: &[u8], params: &Params) -> Vec<u8> {
         let line_number_actual = result.line_number_actual;
         let expected_count = result.expected.len();
         let actual_count = result.actual.len();
+        // GNU prints a one-line range as one number (`3a4`, `5d4`, `2c2`) and a longer
+        // one as `first,last` (`2,3d1`).
+        let expected_range = line_range(line_number_expected, expected_count);
+        let actual_range = line_range(line_number_actual, actual_count);
         match (expected_count, actual_count) {
             (0, 0) => unreachable!(),
+            // 'a' stands for "Add lines"
             (0, _) => writeln!(
-                // 'a' stands for "Add lines"
                 &mut output,
-                "{}a{},{}",
-                line_number_expected - 1,
-                line_number_actual,
-                line_number_actual + actual_count - 1
+                "{}a{actual_range}",
+                line_number_expected - 1
             )
             .unwrap(),
+            // 'd' stands for "Delete lines"
             (_, 0) => writeln!(
-                // 'd' stands for "Delete lines"
                 &mut output,
-                "{},{}d{}",
-                line_number_expected,
-                expected_count + line_number_expected - 1,
+                "{expected_range}d{}",
                 line_number_actual - 1
             )
             .unwrap(),
-            (1, 1) => writeln!(
-                // 'c' stands for "Change lines"
-                // exactly one line replaced by one line
-                &mut output,
-                "{line_number_expected}c{line_number_actual}"
-            )
-            .unwrap(),
-            (1, _) => writeln!(
-                // one line replaced by multiple lines
-                &mut output,
-                "{}c{},{}",
-                line_number_expected,
-                line_number_actual,
-                actual_count + line_number_actual - 1
-            )
-            .unwrap(),
-            (_, 1) => writeln!(
-                // multiple lines replaced by one line
-                &mut output,
-                "{},{}c{}",
-                line_number_expected,
-                expected_count + line_number_expected - 1,
-                line_number_actual
-            )
-            .unwrap(),
-            _ => writeln!(
-                // general case: multiple lines replaced by multiple lines
-                &mut output,
-                "{},{}c{},{}",
-                line_number_expected,
-                expected_count + line_number_expected - 1,
-                line_number_actual,
-                actual_count + line_number_actual - 1
-            )
-            .unwrap(),
+            // 'c' stands for "Change lines"
+            _ => writeln!(&mut output, "{expected_range}c{actual_range}").unwrap(),
         }
         for expected in &result.expected {
             write!(&mut output, "< ").unwrap();
@@ -226,6 +202,92 @@ mod tests {
         let diff = diff(&a, &b, &Params::default());
         let expected = b"1c1\n< a\n---\n> b\n".to_vec();
         assert_eq!(diff, expected);
+    }
+
+    #[test]
+    fn test_gnu_ranges() {
+        // Expected output recorded from GNU diff 3.x (Git for Windows).
+        let cases: [(&[u8], &[u8], &[u8]); 5] = [
+            (
+                b"apple
+apple
+banana
+kiwi
+pear
+",
+                b"apple
+pear
+banana
+apple
+kiwi
+",
+                b"2c2
+< apple
+---
+> pear
+3a4
+> apple
+5d5
+< pear
+",
+            ),
+            (b"1
+2
+3
+", b"1
+2
+3
+4
+5
+", b"3a4,5
+> 4
+> 5
+"),
+            (b"1
+2
+3
+4
+", b"1
+", b"2,4d1
+< 2
+< 3
+< 4
+"),
+            (b"1
+2
+3
+4
+", b"1
+x
+4
+", b"2,3c2
+< 2
+< 3
+---
+> x
+"),
+            (
+                b"a
+b
+",
+                b"x
+y
+z
+",
+                b"1,2c1,3
+< a
+< b
+---
+> x
+> y
+> z
+",
+            ),
+        ];
+        for (a, b, expected) in cases {
+            let got = diff(a, b, &Params::default());
+            assert_eq!(String::from_utf8_lossy(&got), String::from_utf8_lossy(expected));
+        }
     }
 
     #[test]
