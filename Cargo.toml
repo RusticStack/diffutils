@@ -50,3 +50,7 @@ harness = false
 feat_bench_not_cmp = []
 # Turn bench for diffutils diff off
 feat_bench_not_diff = []
+
+# Skua Bash (M3-SH5C): the skua-bash build checks this repo out under skua-bash's own Cargo
+# workspace, so it must be a workspace root of its own.
+[workspace]
