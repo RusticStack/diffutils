@@ -53,6 +53,22 @@ fn second_arg_error(name: &OsStr) -> ! {
 }
 
 fn main() -> ExitCode {
+    // Skua patch: Windows has no SIGPIPE. A write to a closed pipe panics in `unwrap`; exit
+    // silently with 141 instead, as bash reports a SIGPIPE death.
+    #[cfg(windows)]
+    {
+        let hook = std::panic::take_hook();
+        std::panic::set_hook(Box::new(move |info| {
+            let text = info
+                .payload()
+                .downcast_ref::<String>()
+                .map_or("", String::as_str);
+            if text.contains("BrokenPipe") {
+                std::process::exit(141);
+            }
+            hook(info);
+        }));
+    }
     let mut args = std::env::args_os().peekable();
 
     let exe_path = binary_path(&mut args);
