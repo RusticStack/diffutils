@@ -147,19 +147,9 @@ pub fn diff(expected: &[u8], actual: &[u8], params: &Params) -> Vec<u8> {
         match (expected_count, actual_count) {
             (0, 0) => unreachable!(),
             // 'a' stands for "Add lines"
-            (0, _) => writeln!(
-                &mut output,
-                "{}a{actual_range}",
-                line_number_expected - 1
-            )
-            .unwrap(),
+            (0, _) => writeln!(&mut output, "{}a{actual_range}", line_number_expected - 1).unwrap(),
             // 'd' stands for "Delete lines"
-            (_, 0) => writeln!(
-                &mut output,
-                "{expected_range}d{}",
-                line_number_actual - 1
-            )
-            .unwrap(),
+            (_, 0) => writeln!(&mut output, "{expected_range}d{}", line_number_actual - 1).unwrap(),
             // 'c' stands for "Change lines"
             _ => writeln!(&mut output, "{expected_range}c{actual_range}").unwrap(),
         }
@@ -209,84 +199,29 @@ mod tests {
         // Expected output recorded from GNU diff 3.x (Git for Windows).
         let cases: [(&[u8], &[u8], &[u8]); 5] = [
             (
-                b"apple
-apple
-banana
-kiwi
-pear
-",
-                b"apple
-pear
-banana
-apple
-kiwi
-",
-                b"2c2
-< apple
----
-> pear
-3a4
-> apple
-5d5
-< pear
-",
+                b"apple\napple\nbanana\nkiwi\npear\n",
+                b"apple\npear\nbanana\napple\nkiwi\n",
+                b"2c2\n< apple\n---\n> pear\n3a4\n> apple\n5d5\n< pear\n",
             ),
-            (b"1
-2
-3
-", b"1
-2
-3
-4
-5
-", b"3a4,5
-> 4
-> 5
-"),
-            (b"1
-2
-3
-4
-", b"1
-", b"2,4d1
-< 2
-< 3
-< 4
-"),
-            (b"1
-2
-3
-4
-", b"1
-x
-4
-", b"2,3c2
-< 2
-< 3
----
-> x
-"),
+            (b"1\n2\n3\n", b"1\n2\n3\n4\n5\n", b"3a4,5\n> 4\n> 5\n"),
+            (b"1\n2\n3\n4\n", b"1\n", b"2,4d1\n< 2\n< 3\n< 4\n"),
             (
-                b"a
-b
-",
-                b"x
-y
-z
-",
-                b"1,2c1,3
-< a
-< b
----
-> x
-> y
-> z
-",
+                b"1\n2\n3\n4\n",
+                b"1\nx\n4\n",
+                b"2,3c2\n< 2\n< 3\n---\n> x\n",
+            ),
+            (
+                b"a\nb\n",
+                b"x\ny\nz\n",
+                b"1,2c1,3\n< a\n< b\n---\n> x\n> y\n> z\n",
             ),
         ];
         for (a, b, expected) in cases {
             let got = diff(a, b, &Params::default());
-            assert_eq!(String::from_utf8_lossy(&got), String::from_utf8_lossy(expected));
+            assert_eq!(
+                String::from_utf8_lossy(&got),
+                String::from_utf8_lossy(expected)
+            );
         }
     }
 
