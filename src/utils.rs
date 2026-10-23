@@ -71,6 +71,44 @@ pub fn get_modification_time(file_path: &str) -> String {
     modification_time
 }
 
+/// Skua: the name messages start with: argv[0]'s file name without a directory and, on
+/// Windows, without `.exe` (`diff: x: ...`, not `F:\...\diff.exe: x: ...`), as GNU diffutils
+/// prints it in Git Bash.
+pub fn program_name(executable: OsString) -> OsString {
+    let path = std::path::Path::new(&executable);
+    let Some(name) = path.file_name() else {
+        return executable;
+    };
+    let name = name.to_string_lossy().into_owned();
+    if cfg!(windows) {
+        if let Some(stem) = name
+            .len()
+            .checked_sub(4)
+            .filter(|&i| i > 0 && name[i..].eq_ignore_ascii_case(".exe"))
+            .map(|i| &name[..i])
+        {
+            return OsString::from(stem);
+        }
+    }
+    OsString::from(name)
+}
+
+/// Skua: on Windows, GNU's text (as Git Bash's diff prints it) for the Windows errors a file
+/// open hits, instead of Windows' message in the user's language. Other errors are unchanged.
+fn gnu_error_text(error: &std::io::Error) -> Option<&'static str> {
+    if !cfg!(windows) {
+        return None;
+    }
+    Some(match error.raw_os_error()? {
+        2 | 3 | 15 | 123 | 161 => "No such file or directory",
+        5 => "Permission denied",
+        32 | 33 => "Device or resource busy",
+        206 => "File name too long",
+        267 => "Not a directory",
+        _ => return None,
+    })
+}
+
 pub fn format_failure_to_read_input_file(
     executable: &OsString,
     filepath: &OsString,
@@ -83,7 +121,12 @@ pub fn format_failure_to_read_input_file(
         "{}: {}: {}",
         executable.to_string_lossy(),
         filepath.to_string_lossy(),
-        error_code_re.replace(error.to_string().as_str(), ""),
+        gnu_error_text(error).map_or_else(
+            || error_code_re
+                .replace(error.to_string().as_str(), "")
+                .into_owned(),
+            str::to_owned
+        ),
     )
 }
 

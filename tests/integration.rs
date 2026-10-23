@@ -52,10 +52,8 @@ mod common {
         let nopath = nofile.into_temp_path();
         std::fs::remove_file(&nopath)?;
 
-        #[cfg(not(windows))]
+        // Skua: Windows prints GNU's text too.
         let error_message = "No such file or directory";
-        #[cfg(windows)]
-        let error_message = "The system cannot find the file specified.";
 
         for subcmd in ["diff", "cmp"] {
             let mut cmd = cargo_bin_cmd!("diffutils");

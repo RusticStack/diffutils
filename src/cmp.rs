@@ -72,6 +72,7 @@ fn is_stdout_dev_null() -> bool {
 
 pub fn parse_params<I: Iterator<Item = OsString>>(mut opts: Peekable<I>) -> Result<Params, String> {
     let executable = opts.next().ok_or("Usage: <exe> <from> <to>".to_string())?;
+    let executable = crate::utils::program_name(executable);
     let executable_str = executable.to_string_lossy().to_string();
 
     let parse_skip = |param: &str, skip_desc: &str| -> Result<SkipU64, String> {

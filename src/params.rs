@@ -52,7 +52,7 @@ pub fn parse_params<I: Iterator<Item = OsString>>(mut opts: Peekable<I>) -> Resu
         return Err("Usage: <exe> <from> <to>".to_string());
     };
     let mut params = Params {
-        executable,
+        executable: crate::utils::program_name(executable),
         ..Default::default()
     };
     let mut from = None;
